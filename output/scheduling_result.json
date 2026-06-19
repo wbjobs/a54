@@ -1,75 +1,61 @@
 {
   "summary": {
     "total_courses": 17,
-    "adjusted_count": 17,
-    "conflicts_before": 8,
+    "adjusted_count": 9,
+    "conflicts_before": 6,
     "conflicts_after": 0,
-    "ga_generations": 2,
-    "ga_elapsed_seconds": 0.023,
-    "final_best_fitness": 0.978703
+    "ga_generations": 1,
+    "ga_elapsed_seconds": 0.011,
+    "final_best_fitness": 0.9711
   },
   "conflicts_before": {
     "conflicts": [
       {
         "conflict_type": "class",
-        "course_id_1": 0,
-        "course_id_2": 6,
-        "timeslot_id": 6,
-        "detail": "班级{'计科1班'}同时上高等数学(1)和操作系统(1)"
-      },
-      {
-        "conflict_type": "class",
-        "course_id_1": 3,
-        "course_id_2": 9,
-        "timeslot_id": 10,
-        "detail": "班级{'计科2班'}同时上离散数学(1)和计算机网络(2)"
-      },
-      {
-        "conflict_type": "class",
-        "course_id_1": 3,
-        "course_id_2": 10,
-        "timeslot_id": 10,
-        "detail": "班级{'计科2班'}同时上离散数学(1)和数据库原理(1)"
+        "course_id_1": 6,
+        "course_id_2": 16,
+        "timeslot_id": 16,
+        "detail": "班级{'计科1班'}同时上操作系统(1)和思想政治(1)"
       },
       {
         "conflict_type": "class",
         "course_id_1": 9,
-        "course_id_2": 10,
-        "timeslot_id": 10,
-        "detail": "班级{'计科2班'}同时上计算机网络(2)和数据库原理(1)"
+        "course_id_2": 11,
+        "timeslot_id": 2,
+        "detail": "班级{'计科2班'}同时上计算机网络(2)和数据库原理(2)"
       },
       {
         "conflict_type": "class",
-        "course_id_1": 4,
+        "course_id_1": 9,
         "course_id_2": 14,
-        "timeslot_id": 7,
-        "detail": "班级{'计科2班', '计科1班'}同时上数据结构(1)和人工智能(1)"
+        "timeslot_id": 2,
+        "detail": "班级{'计科2班'}同时上计算机网络(2)和人工智能(1)"
       },
       {
         "conflict_type": "class",
-        "course_id_1": 5,
+        "course_id_1": 11,
         "course_id_2": 12,
-        "timeslot_id": 20,
-        "detail": "班级{'计科1班'}同时上数据结构(2)和软件工程(1)"
+        "timeslot_id": 2,
+        "detail": "班级{'计科1班'}同时上数据库原理(2)和软件工程(1)"
       },
       {
         "conflict_type": "class",
         "course_id_1": 11,
-        "course_id_2": 15,
-        "timeslot_id": 23,
-        "detail": "班级{'计科2班', '计科1班'}同时上数据库原理(2)和大学英语(1)"
+        "course_id_2": 14,
+        "timeslot_id": 2,
+        "detail": "班级{'计科2班', '计科1班'}同时上数据库原理(2)和人工智能(1)"
       },
       {
-        "conflict_type": "classroom",
-        "course_id_1": 11,
-        "course_id_2": 15,
-        "timeslot_id": 23,
-        "detail": "教室教学楼A-202同时被数据库原理(2)和大学英语(1)占用"
+        "conflict_type": "class",
+        "course_id_1": 12,
+        "course_id_2": 14,
+        "timeslot_id": 2,
+        "detail": "班级{'计科1班'}同时上软件工程(1)和人工智能(1)"
       }
     ],
     "teacher_conflicts": 0,
-    "class_conflicts": 7,
-    "classroom_conflicts": 1,
+    "class_conflicts": 6,
+    "classroom_conflicts": 0,
     "capacity_violations": 0,
     "type_violations": 0
   },
@@ -83,154 +69,6 @@
   },
   "adjustments": [
     {
-      "course_id": 0,
-      "course_name": "高等数学(1)",
-      "teacher": "张教授",
-      "classes": [
-        "计科1班",
-        "计科2班"
-      ],
-      "old": {
-        "course_id": 0,
-        "timeslot_id": 6,
-        "classroom_id": 0
-      },
-      "new": {
-        "course_id": 0,
-        "timeslot_id": 3,
-        "classroom_id": 6
-      }
-    },
-    {
-      "course_id": 1,
-      "course_name": "高等数学(2)",
-      "teacher": "张教授",
-      "classes": [
-        "计科1班",
-        "计科2班"
-      ],
-      "old": {
-        "course_id": 1,
-        "timeslot_id": 19,
-        "classroom_id": 1
-      },
-      "new": {
-        "course_id": 1,
-        "timeslot_id": 16,
-        "classroom_id": 7
-      }
-    },
-    {
-      "course_id": 2,
-      "course_name": "线性代数(1)",
-      "teacher": "李教授",
-      "classes": [
-        "计科1班"
-      ],
-      "old": {
-        "course_id": 2,
-        "timeslot_id": 14,
-        "classroom_id": 2
-      },
-      "new": {
-        "course_id": 2,
-        "timeslot_id": 21,
-        "classroom_id": 0
-      }
-    },
-    {
-      "course_id": 3,
-      "course_name": "离散数学(1)",
-      "teacher": "王教授",
-      "classes": [
-        "计科2班"
-      ],
-      "old": {
-        "course_id": 3,
-        "timeslot_id": 10,
-        "classroom_id": 3
-      },
-      "new": {
-        "course_id": 3,
-        "timeslot_id": 1,
-        "classroom_id": 5
-      }
-    },
-    {
-      "course_id": 4,
-      "course_name": "数据结构(1)",
-      "teacher": "赵教授",
-      "classes": [
-        "计科1班",
-        "计科2班"
-      ],
-      "old": {
-        "course_id": 4,
-        "timeslot_id": 7,
-        "classroom_id": 0
-      },
-      "new": {
-        "course_id": 4,
-        "timeslot_id": 0,
-        "classroom_id": 7
-      }
-    },
-    {
-      "course_id": 5,
-      "course_name": "数据结构(2)",
-      "teacher": "赵教授",
-      "classes": [
-        "计科1班",
-        "计科2班"
-      ],
-      "old": {
-        "course_id": 5,
-        "timeslot_id": 20,
-        "classroom_id": 1
-      },
-      "new": {
-        "course_id": 5,
-        "timeslot_id": 23,
-        "classroom_id": 6
-      }
-    },
-    {
-      "course_id": 6,
-      "course_name": "操作系统(1)",
-      "teacher": "刘教授",
-      "classes": [
-        "计科1班"
-      ],
-      "old": {
-        "course_id": 6,
-        "timeslot_id": 6,
-        "classroom_id": 6
-      },
-      "new": {
-        "course_id": 6,
-        "timeslot_id": 17,
-        "classroom_id": 1
-      }
-    },
-    {
-      "course_id": 7,
-      "course_name": "操作系统(2)",
-      "teacher": "刘教授",
-      "classes": [
-        "计科1班"
-      ],
-      "old": {
-        "course_id": 7,
-        "timeslot_id": 18,
-        "classroom_id": 7
-      },
-      "new": {
-        "course_id": 7,
-        "timeslot_id": 12,
-        "classroom_id": 7
-      }
-    },
-    {
       "course_id": 8,
       "course_name": "计算机网络(1)",
       "teacher": "陈教授",
@@ -239,13 +77,13 @@
       ],
       "old": {
         "course_id": 8,
-        "timeslot_id": 22,
+        "timeslot_id": 20,
         "classroom_id": 0
       },
       "new": {
         "course_id": 8,
-        "timeslot_id": 14,
-        "classroom_id": 4
+        "timeslot_id": 18,
+        "classroom_id": 1
       }
     },
     {
@@ -257,13 +95,13 @@
       ],
       "old": {
         "course_id": 9,
-        "timeslot_id": 10,
+        "timeslot_id": 2,
         "classroom_id": 1
       },
       "new": {
         "course_id": 9,
-        "timeslot_id": 11,
-        "classroom_id": 6
+        "timeslot_id": 4,
+        "classroom_id": 2
       }
     },
     {
@@ -276,13 +114,13 @@
       ],
       "old": {
         "course_id": 10,
-        "timeslot_id": 10,
+        "timeslot_id": 21,
         "classroom_id": 6
       },
       "new": {
         "course_id": 10,
-        "timeslot_id": 2,
-        "classroom_id": 7
+        "timeslot_id": 5,
+        "classroom_id": 0
       }
     },
     {
@@ -295,12 +133,12 @@
       ],
       "old": {
         "course_id": 11,
-        "timeslot_id": 23,
+        "timeslot_id": 2,
         "classroom_id": 7
       },
       "new": {
         "course_id": 11,
-        "timeslot_id": 5,
+        "timeslot_id": 22,
         "classroom_id": 1
       }
     },
@@ -313,12 +151,12 @@
       ],
       "old": {
         "course_id": 12,
-        "timeslot_id": 20,
+        "timeslot_id": 2,
         "classroom_id": 4
       },
       "new": {
         "course_id": 12,
-        "timeslot_id": 4,
+        "timeslot_id": 11,
         "classroom_id": 0
       }
     },
@@ -331,13 +169,13 @@
       ],
       "old": {
         "course_id": 13,
-        "timeslot_id": 3,
+        "timeslot_id": 14,
         "classroom_id": 5
       },
       "new": {
         "course_id": 13,
-        "timeslot_id": 20,
-        "classroom_id": 1
+        "timeslot_id": 10,
+        "classroom_id": 0
       }
     },
     {
@@ -350,13 +188,13 @@
       ],
       "old": {
         "course_id": 14,
-        "timeslot_id": 7,
+        "timeslot_id": 2,
         "classroom_id": 6
       },
       "new": {
         "course_id": 14,
-        "timeslot_id": 13,
-        "classroom_id": 1
+        "timeslot_id": 9,
+        "classroom_id": 6
       }
     },
     {
@@ -369,13 +207,13 @@
       ],
       "old": {
         "course_id": 15,
-        "timeslot_id": 23,
+        "timeslot_id": 17,
         "classroom_id": 7
       },
       "new": {
         "course_id": 15,
-        "timeslot_id": 18,
-        "classroom_id": 6
+        "timeslot_id": 12,
+        "classroom_id": 0
       }
     },
     {
@@ -388,13 +226,13 @@
       ],
       "old": {
         "course_id": 16,
-        "timeslot_id": 2,
+        "timeslot_id": 16,
         "classroom_id": 0
       },
       "new": {
         "course_id": 16,
-        "timeslot_id": 24,
-        "classroom_id": 1
+        "timeslot_id": 1,
+        "classroom_id": 0
       }
     }
   ]

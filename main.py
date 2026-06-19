@@ -198,6 +198,12 @@ def run_scheduler(
     elite_count: int = 4,
     random_seed: int = 42,
     use_random_initial: bool = False,
+    use_improved_ga: bool = True,
+    fitness_sharing: bool = True,
+    adaptive_mutation: bool = True,
+    diversity_preserve: bool = True,
+    migration_rate: float = 0.05,
+    large_scale_test: bool = False,
 ):
     ensure_output_dir()
     print_banner()
@@ -262,28 +268,53 @@ def run_scheduler(
     )
 
     print("\n  [步骤5/6] 遗传算法优化排课...")
-    print(f"    参数: 种群={population_size}, 最大代数={max_generations}, "
-          f"变异率={mutation_rate}, 精英保留={elite_count}")
-
-    ga = GeneticAlgorithmScheduler(
-        schedule=schedule,
-        expanded_courses=expanded_courses,
+    ga_kwargs = dict(
         population_size=population_size,
         max_generations=max_generations,
         mutation_rate=mutation_rate,
         elite_count=elite_count,
         random_seed=random_seed,
     )
+    if use_improved_ga:
+        ga_kwargs.update(dict(
+            fitness_sharing=fitness_sharing,
+            adaptive_mutation=adaptive_mutation,
+            diversity_preserve=diversity_preserve,
+            migration_rate=migration_rate,
+        ))
+        mode_str = "增强模式 (矢量化+抗早熟)"
+    else:
+        ga_kwargs.update(dict(
+            fitness_sharing=False,
+            adaptive_mutation=False,
+            diversity_preserve=False,
+            migration_rate=0.0,
+        ))
+        mode_str = "基础模式"
+    print(f"    模式: {mode_str}")
+    print(f"    参数: 种群={population_size}, 最大代数={max_generations}, "
+          f"初始变异率={mutation_rate}, 精英保留={elite_count}")
+
+    ga = GeneticAlgorithmScheduler(
+        schedule=schedule,
+        expanded_courses=expanded_courses,
+        **ga_kwargs
+    )
 
     optimized_assignments, report_after, history = ga.optimize(
         initial_assignments=initial_assignments,
         target_conflicts=0,
-        patience=80,
+        patience=120,
         verbose=True,
     )
     conflicting_after = detector.get_conflicting_courses(report_after)
 
     print_conflict_report(report_after, "优化后方案冲突检测报告")
+
+    print(f"\n  算法统计: 总代数={len(history.generations)}, "
+          f"耗时={history.elapsed_time:.3f}秒, "
+          f"重启次数={getattr(history, 'restarts', 0)}, "
+          f"最终多样性={history.diversity[-1] if history.diversity else 'N/A'}")
 
     print("\n  [步骤6/6] 生成可视化结果与报告...")
     adjustments = find_adjustments(initial_assignments, optimized_assignments)
@@ -346,7 +377,7 @@ def main():
     parser.add_argument("--max-gen", type=int, default=300,
                         help="最大进化代数 (默认: 300)")
     parser.add_argument("--mutation-rate", type=float, default=0.08,
-                        help="变异概率 (默认: 0.08)")
+                        help="初始变异概率 (默认: 0.08)")
     parser.add_argument("--elite-count", type=int, default=4,
                         help="精英保留数量 (默认: 4)")
     parser.add_argument("--seed", type=int, default=42,
@@ -355,6 +386,16 @@ def main():
                         help="使用完全随机的初始方案")
     parser.add_argument("--output", type=str, default="output",
                         help="输出目录 (默认: output)")
+    parser.add_argument("--basic-mode", action="store_true",
+                        help="禁用抗早熟收敛机制(基础模式)，用于对比")
+    parser.add_argument("--no-fitness-sharing", action="store_true",
+                        help="禁用适应度共享")
+    parser.add_argument("--no-adaptive-mutation", action="store_true",
+                        help="禁用自适应变异率")
+    parser.add_argument("--no-diversity", action="store_true",
+                        help="禁用多样性保持与部分重启")
+    parser.add_argument("--migration-rate", type=float, default=0.05,
+                        help="随机移民比例 (默认: 0.05)")
 
     args = parser.parse_args()
 
@@ -369,6 +410,11 @@ def main():
             elite_count=args.elite_count,
             random_seed=args.seed,
             use_random_initial=args.random_initial,
+            use_improved_ga=not args.basic_mode,
+            fitness_sharing=not args.no_fitness_sharing,
+            adaptive_mutation=not args.no_adaptive_mutation,
+            diversity_preserve=not args.no_diversity,
+            migration_rate=args.migration_rate,
         )
     except KeyboardInterrupt:
         print("\n\n用户中断执行。")

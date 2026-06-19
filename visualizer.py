@@ -193,16 +193,23 @@ def visualize_timetable(
 def visualize_convergence(
     history: GAHistory,
     save_path: Optional[str] = None,
-    figsize: Tuple[int, int] = (14, 8),
+    figsize: Tuple[int, int] = (16, 10),
 ):
-    fig, axes = plt.subplots(2, 2, figsize=figsize)
+    has_diversity = len(history.diversity) > 0
+    has_mutation = len(history.mutation_rates) > 0
+    nrows = 3 if (has_diversity or has_mutation) else 2
+
+    fig, axes = plt.subplots(nrows, 2, figsize=figsize)
+    if nrows == 2:
+        axes = axes.reshape(2, 2)
 
     gens = history.generations
 
     axes[0, 0].plot(gens, history.best_fitness, color='#2E86AB', linewidth=2, label='最佳适应度')
     axes[0, 0].plot(gens, history.avg_fitness, color='#A23B72', linewidth=1.5, alpha=0.8, label='平均适应度')
-    axes[0, 0].fill_between(gens, history.worst_fitness, history.best_fitness,
-                            alpha=0.15, color='#2E86AB')
+    if len(history.worst_fitness) == len(gens):
+        axes[0, 0].fill_between(gens, history.worst_fitness, history.best_fitness,
+                                alpha=0.15, color='#2E86AB')
     axes[0, 0].set_xlabel('进化代数', fontsize=11)
     axes[0, 0].set_ylabel('适应度', fontsize=11)
     axes[0, 0].set_title('适应度收敛曲线', fontsize=13, fontweight='bold')
@@ -243,17 +250,83 @@ def visualize_convergence(
     axes[1, 0].set_title('每代适应度改善量', fontsize=13, fontweight='bold')
     axes[1, 0].grid(True, alpha=0.3, linestyle='--', axis='y')
 
-    stats_text = (
-        f"总进化代数: {len(gens)}\n"
-        f"耗时: {history.elapsed_time:.2f}秒\n"
-        f"最终最佳适应度: {history.best_fitness[-1]:.6f}\n"
-        f"最终冲突数: {history.conflict_counts[-1]}"
-    )
-    axes[1, 1].axis('off')
-    axes[1, 1].text(0.1, 0.9, stats_text,
-                    fontsize=12, va='top', fontfamily='monospace',
-                    bbox=dict(boxstyle='round,pad=0.8', facecolor='#F8F9FA',
-                              edgecolor='#DEE2E6', linewidth=2))
+    if has_diversity:
+        ax_div = axes[1, 1]
+        color_div = '#2A9D8F'
+        ax_div.plot(gens, history.diversity, color=color_div, linewidth=2,
+                    label='种群多样性')
+        ax_div.axhline(y=0.6, color='#8AB17D', linestyle='-.', alpha=0.7,
+                       linewidth=1.2, label='多样性充足(0.6)')
+        ax_div.axhline(y=0.15, color='#E9C46A', linestyle=':', alpha=0.8,
+                       linewidth=1.5, label='变异触发阈值(0.15)')
+        if history.restarts > 0:
+            ax_div.axhline(y=0.12, color='#E76F51', linestyle='--', alpha=0.7,
+                           linewidth=1.2, label='重启阈值(0.12)')
+        ax_div.set_xlabel('进化代数', fontsize=11)
+        ax_div.set_ylabel('多样性 (汉明距离)', fontsize=11, color=color_div)
+        ax_div.tick_params(axis='y', labelcolor=color_div)
+        ax_div.set_ylim(bottom=0, top=1.05)
+        ax_div.set_title('种群多样性 & 自适应变异率', fontsize=13, fontweight='bold')
+        ax_div.grid(True, alpha=0.3, linestyle='--')
+
+        if has_mutation:
+            ax_mut = ax_div.twinx()
+            color_mut = '#264653'
+            ax_mut.plot(gens, history.mutation_rates, color=color_mut,
+                        linewidth=1.8, linestyle='-.', alpha=0.85,
+                        label='变异概率')
+            ax_mut.set_ylabel('变异率', fontsize=11, color=color_mut)
+            ax_mut.tick_params(axis='y', labelcolor=color_mut)
+            ax_mut.set_ylim(bottom=0, top=0.55)
+
+            lines1, labels1 = ax_div.get_legend_handles_labels()
+            lines2, labels2 = ax_mut.get_legend_handles_labels()
+            ax_div.legend(lines1 + lines2, labels1 + labels2,
+                          fontsize=9, loc='upper right')
+        else:
+            ax_div.legend(fontsize=9)
+    else:
+        stats_text = (
+            f"总进化代数: {len(gens)}\n"
+            f"耗时: {history.elapsed_time:.2f}秒\n"
+            f"最终最佳适应度: {history.best_fitness[-1]:.6f}\n"
+            f"最终冲突数: {history.conflict_counts[-1]}"
+        )
+        axes[1, 1].axis('off')
+        axes[1, 1].text(0.1, 0.9, stats_text,
+                        fontsize=12, va='top', fontfamily='monospace',
+                        bbox=dict(boxstyle='round,pad=0.8', facecolor='#F8F9FA',
+                                  edgecolor='#DEE2E6', linewidth=2))
+
+    if nrows == 3:
+        stats_text = (
+            f"总进化代数: {len(gens)}\n"
+            f"耗时: {history.elapsed_time:.2f}秒\n"
+            f"最终最佳适应度: {history.best_fitness[-1]:.6f}\n"
+            f"最终冲突数: {history.conflict_counts[-1]}\n"
+            f"触发部分重启: {history.restarts} 次"
+        )
+        axes[2, 0].axis('off')
+        axes[2, 0].text(0.05, 0.95, stats_text,
+                        fontsize=11, va='top', fontfamily='monospace',
+                        bbox=dict(boxstyle='round,pad=0.8', facecolor='#F8F9FA',
+                                  edgecolor='#DEE2E6', linewidth=2))
+
+        if has_diversity and len(gens) > 2:
+            diversity_arr = np.array(history.diversity)
+            counts, bins = np.histogram(diversity_arr, bins=15, range=(0, 1))
+            axes[2, 1].bar(bins[:-1], counts, width=np.diff(bins)[0] * 0.9,
+                           color='#457B9D', alpha=0.8, edgecolor='white')
+            axes[2, 1].axvline(x=np.mean(diversity_arr), color='#E63946',
+                               linestyle='--', linewidth=2,
+                               label=f'均值={np.mean(diversity_arr):.3f}')
+            axes[2, 1].set_xlabel('多样性区间', fontsize=11)
+            axes[2, 1].set_ylabel('代数', fontsize=11)
+            axes[2, 1].set_title('多样性分布直方图', fontsize=13, fontweight='bold')
+            axes[2, 1].legend(fontsize=10)
+            axes[2, 1].grid(True, alpha=0.3, axis='y', linestyle='--')
+        else:
+            axes[2, 1].axis('off')
 
     title = "遗传算法优化过程可视化"
     fig.suptitle(title, fontsize=15, fontweight='bold', y=0.98)
