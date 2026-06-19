@@ -14,8 +14,9 @@ from conflict_detector import (
     ConflictDetector, ConflictReport, generate_random_schedule
 )
 from genetic_scheduler import (
-    GeneticAlgorithmScheduler, GAHistory, find_adjustments
+    GeneticAlgorithmScheduler, GAHistory, PreferenceResult, find_adjustments
 )
+from data_structures import Preference, LockedCourse, create_sample_preferences, create_sample_locks
 
 
 class TestDataStructures(unittest.TestCase):
@@ -305,7 +306,7 @@ class TestGeneticAlgorithm(unittest.TestCase):
             ScheduleAssignment(i, 0, 0)
             for i in range(len(self.expanded))
         ]
-        optimized, report, history = ga.optimize(
+        optimized, report, history, pref_result = ga.optimize(
             initial_assignments=initial,
             target_conflicts=0,
             patience=10,
@@ -316,6 +317,7 @@ class TestGeneticAlgorithm(unittest.TestCase):
         self.assertEqual(len(history.best_fitness), len(history.generations))
         self.assertEqual(len(history.conflict_counts), len(history.generations))
         self.assertGreater(history.elapsed_time, 0)
+        self.assertIsNotNone(pref_result)
 
     def test_find_adjustments(self):
         old = [
@@ -375,7 +377,7 @@ class TestEndToEnd(unittest.TestCase):
             elite_count=3,
             random_seed=42,
         )
-        optimized, report_after, history = ga.optimize(
+        optimized, report_after, history, pref_result = ga.optimize(
             initial_assignments=initial,
             target_conflicts=0,
             patience=20,
@@ -386,10 +388,211 @@ class TestEndToEnd(unittest.TestCase):
         self.assertIsNotNone(report_after)
         self.assertIsNotNone(history)
         self.assertGreater(len(history.generations), 0)
+        self.assertIsNotNone(pref_result)
 
         if report_before.has_conflicts():
             adjustments = find_adjustments(initial, optimized)
             self.assertIsInstance(adjustments, list)
+
+
+class TestPreferences(unittest.TestCase):
+
+    def test_preference_creation(self):
+        pref = Preference(
+            pref_id=0,
+            pref_type="teacher_time",
+            target="张教授",
+            target_name="张教授",
+            allowed_days=[1],
+            allowed_periods=[0, 1],
+            priority="hard",
+            weight=8.0,
+            description="张教授只愿意在周二上午上课"
+        )
+        self.assertTrue(pref.is_satisfied(1, 0, 0))
+        self.assertFalse(pref.is_satisfied(0, 0, 0))
+        self.assertFalse(pref.is_satisfied(1, 3, 0))
+        self.assertEqual(pref.priority, "hard")
+
+    def test_preference_classroom_constraint(self):
+        pref = Preference(
+            pref_id=1,
+            pref_type="course_room",
+            target="人工智能",
+            target_name="人工智能",
+            allowed_classroom_ids=[6, 7],
+            priority="soft",
+            weight=3.0,
+        )
+        self.assertTrue(pref.is_satisfied(0, 0, 6))
+        self.assertFalse(pref.is_satisfied(0, 0, 0))
+
+    def test_create_sample_preferences(self):
+        prefs = create_sample_preferences()
+        self.assertEqual(len(prefs), 5)
+        hard_count = sum(1 for p in prefs if p.priority == "hard")
+        self.assertEqual(hard_count, 2)
+
+    def test_ga_with_preferences(self):
+        courses, classrooms, timeslots = create_sample_data()
+        schedule = Schedule(
+            courses=courses, classrooms=classrooms,
+            timeslots=timeslots, assignments=[]
+        )
+        expanded = expand_courses_to_sessions(courses)
+        prefs = create_sample_preferences()
+
+        assignments = []
+        np.random.seed(123)
+        for i, c in enumerate(expanded):
+            valid_rooms = [r.classroom_id for r in classrooms
+                           if r.capacity >= c.student_count]
+            ts_id = np.random.randint(0, len(timeslots))
+            room_id = valid_rooms[i % len(valid_rooms)] if valid_rooms else 0
+            assignments.append(ScheduleAssignment(
+                course_id=i, timeslot_id=ts_id, classroom_id=room_id
+            ))
+
+        ga = GeneticAlgorithmScheduler(
+            schedule=schedule,
+            expanded_courses=expanded,
+            population_size=60,
+            max_generations=150,
+            random_seed=123,
+            preferences=prefs,
+        )
+        self.assertTrue(ga.has_preferences)
+        self.assertGreater(ga.total_pref_weight, 0)
+
+        optimized, report, history, pref_result = ga.optimize(
+            initial_assignments=assignments,
+            target_conflicts=0,
+            patience=80,
+            verbose=False,
+        )
+
+        self.assertEqual(report.total_conflicts(), 0)
+        self.assertEqual(pref_result.total_preferences, 5)
+        self.assertGreaterEqual(pref_result.satisfied_count, 0)
+        self.assertLessEqual(pref_result.satisfied_count, 5)
+        self.assertGreaterEqual(pref_result.satisfaction_rate, 0.0)
+        self.assertLessEqual(pref_result.satisfaction_rate, 1.0)
+
+
+class TestLockedCourses(unittest.TestCase):
+
+    def test_locked_course_creation(self):
+        lock = LockedCourse(
+            course_id=3,
+            timeslot_id=5,
+            classroom_id=2,
+            lock_timeslot=True,
+            lock_classroom=True,
+            reason="实验设备已预约"
+        )
+        self.assertEqual(lock.course_id, 3)
+        self.assertEqual(lock.timeslot_id, 5)
+        self.assertEqual(lock.classroom_id, 2)
+        self.assertTrue(lock.lock_timeslot)
+        self.assertTrue(lock.lock_classroom)
+
+    def test_create_sample_locks(self):
+        locks = create_sample_locks()
+        self.assertGreater(len(locks), 0)
+
+    def test_locks_preserved_in_initial_population(self):
+        courses, classrooms, timeslots = create_sample_data()
+        schedule = Schedule(
+            courses=courses, classrooms=classrooms,
+            timeslots=timeslots, assignments=[]
+        )
+        expanded = expand_courses_to_sessions(courses)
+
+        lock_cid = 8
+        lock_ts = 12
+        lock_rm = 4
+        locks = [LockedCourse(
+            course_id=lock_cid,
+            timeslot_id=lock_ts,
+            classroom_id=lock_rm,
+            lock_timeslot=True,
+            lock_classroom=True,
+            reason="测试锁定"
+        )]
+
+        ga = GeneticAlgorithmScheduler(
+            schedule=schedule,
+            expanded_courses=expanded,
+            population_size=30,
+            max_generations=10,
+            random_seed=42,
+            locked_courses=locks,
+        )
+
+        self.assertEqual(ga.num_locked, 1)
+        self.assertTrue(ga.locked_ts_mask[lock_cid])
+        self.assertTrue(ga.locked_rm_mask[lock_cid])
+
+        pop = ga._initialize_population([])
+        for i in range(pop.shape[0]):
+            self.assertEqual(pop[i, lock_cid, 0], lock_ts)
+            self.assertEqual(pop[i, lock_cid, 1], lock_rm)
+
+    def test_locks_preserved_after_optimization(self):
+        courses, classrooms, timeslots = create_sample_data()
+        schedule = Schedule(
+            courses=courses, classrooms=classrooms,
+            timeslots=timeslots, assignments=[]
+        )
+        expanded = expand_courses_to_sessions(courses)
+
+        lock_cid = 8
+        lock_ts = 12
+        lock_rm = 4
+        locks = [LockedCourse(
+            course_id=lock_cid,
+            timeslot_id=lock_ts,
+            classroom_id=lock_rm,
+            lock_timeslot=True,
+            lock_classroom=True,
+            reason="测试锁定"
+        )]
+
+        assignments = []
+        np.random.seed(77)
+        for i, c in enumerate(expanded):
+            valid_rooms = [r.classroom_id for r in classrooms
+                           if r.capacity >= c.student_count]
+            ts_id = np.random.randint(0, len(timeslots))
+            room_id = valid_rooms[i % len(valid_rooms)] if valid_rooms else 0
+            assignments.append(ScheduleAssignment(
+                course_id=i, timeslot_id=ts_id, classroom_id=room_id
+            ))
+
+        ga = GeneticAlgorithmScheduler(
+            schedule=schedule,
+            expanded_courses=expanded,
+            population_size=50,
+            max_generations=100,
+            random_seed=77,
+            locked_courses=locks,
+        )
+
+        optimized, report, history, pref_result = ga.optimize(
+            initial_assignments=assignments,
+            target_conflicts=0,
+            patience=50,
+            verbose=False,
+        )
+
+        locked_a = None
+        for a in optimized:
+            if a.course_id == lock_cid:
+                locked_a = a
+                break
+        self.assertIsNotNone(locked_a)
+        self.assertEqual(locked_a.timeslot_id, lock_ts)
+        self.assertEqual(locked_a.classroom_id, lock_rm)
 
 
 def run_tests():
@@ -404,6 +607,8 @@ def run_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestConflictDetection))
     suite.addTests(loader.loadTestsFromTestCase(TestGeneticAlgorithm))
     suite.addTests(loader.loadTestsFromTestCase(TestEndToEnd))
+    suite.addTests(loader.loadTestsFromTestCase(TestPreferences))
+    suite.addTests(loader.loadTestsFromTestCase(TestLockedCourses))
 
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)

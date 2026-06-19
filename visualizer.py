@@ -35,6 +35,7 @@ def visualize_timetable(
     assignments: List[ScheduleAssignment],
     conflicting_courses: Optional[Set[int]] = None,
     adjusted_courses: Optional[Set[int]] = None,
+    locked_courses: Optional[Set[int]] = None,
     title: str = "课程安排表",
     save_path: Optional[str] = None,
     figsize: Tuple[int, int] = (16, 10),
@@ -81,23 +82,45 @@ def visualize_timetable(
                            a.course_id in conflicting_courses)
             is_adjusted = (adjusted_courses is not None and
                            a.course_id in adjusted_courses)
+            is_locked = (locked_courses is not None and
+                         a.course_id in locked_courses)
 
             sub_width = cell_width / max(n_in_cell, 1)
             x0 = d * cell_width + idx_in_cell * sub_width
             y0 = (num_periods - 1 - p) * cell_height
 
+            edge_color = 'red' if is_conflict else ('#228B22' if is_locked else 'black')
+            edge_width = 2.0 if is_conflict or is_locked else 0.8
+
             rect = Rectangle(
                 (x0, y0), sub_width, cell_height,
                 facecolor=base_color,
-                edgecolor='black',
-                linewidth=1.5 if is_conflict else 0.8,
+                edgecolor=edge_color,
+                linewidth=edge_width,
                 alpha=0.85
             )
             ax.add_patch(rect)
 
+            if is_locked:
+                lock_rect = Rectangle(
+                    (x0 + 0.02, y0 + 0.02), 0.12, 0.12,
+                    facecolor='#228B22',
+                    edgecolor='#006400',
+                    linewidth=1.0,
+                    zorder=10
+                )
+                ax.add_patch(lock_rect)
+                ax.text(
+                    x0 + 0.08, y0 + 0.08,
+                    '🔒',
+                    ha='center', va='center',
+                    fontsize=8,
+                    zorder=11
+                )
+
             if is_adjusted:
                 marker = Rectangle(
-                    (x0 + 0.02, y0 + cell_height - 0.12), 0.1, 0.1,
+                    (x0 + sub_width - 0.14, y0 + cell_height - 0.14), 0.12, 0.12,
                     facecolor='#FFD700',
                     edgecolor='#FF8C00',
                     linewidth=1.5,

@@ -12,13 +12,14 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='repla
 
 from data_structures import (
     Course, Classroom, TimeSlot, Schedule, ScheduleAssignment,
-    create_sample_data, expand_courses_to_sessions
+    create_sample_data, expand_courses_to_sessions,
+    create_sample_preferences, create_sample_locks
 )
 from conflict_detector import (
     ConflictDetector, ConflictReport, Conflict, generate_random_schedule
 )
 from genetic_scheduler import (
-    GeneticAlgorithmScheduler, GAHistory, find_adjustments
+    GeneticAlgorithmScheduler, GAHistory, PreferenceResult, find_adjustments
 )
 from visualizer import (
     visualize_timetable, visualize_convergence,
@@ -111,6 +112,37 @@ def print_adjustments(adjustments, expanded_courses, schedule):
     print(f"{'='*60}\n")
 
 
+def print_preference_result(pref_result: PreferenceResult):
+    print(f"\n{'='*60}")
+    print(f"  偏好约束满足情况")
+    print(f"{'='*60}")
+    if pref_result.total_preferences == 0:
+        print("  未设置任何偏好约束")
+    else:
+        print(f"  总偏好数:      {pref_result.total_preferences}")
+        print(f"  硬约束数:      {pref_result.hard_preferences}")
+        print(f"  软偏好数:      {pref_result.soft_preferences}")
+        print(f"  满足数量:      {pref_result.satisfied_count}")
+        print(f"  硬约束满足:    {pref_result.hard_satisfied}/{pref_result.hard_preferences}")
+        print(f"  软偏好满足:    {pref_result.soft_satisfied}/{pref_result.soft_preferences}")
+        print(f"  满足率:        {pref_result.satisfaction_rate*100:.1f}%")
+
+        hard_violated = pref_result.hard_preferences - pref_result.hard_satisfied
+        if hard_violated > 0:
+            print(f"  ⚠  有 {hard_violated} 条硬约束未能满足!")
+
+        if pref_result.violated_details:
+            print(f"\n  未满足偏好详情 (前10条):")
+            for i, v in enumerate(pref_result.violated_details[:10]):
+                prio = "硬约束" if v["priority"] == "hard" else "软偏好"
+                print(f"    [{i+1:2d}] [{prio}] {v['description']}")
+                print(f"         课程: {v['course_name']}")
+                print(f"         实际安排: 周{v['actual_day']+1} 第{v['actual_period']+1}-{v['actual_period']+2}节")
+            if len(pref_result.violated_details) > 10:
+                print(f"    ... 另有 {len(pref_result.violated_details) - 10} 条未显示")
+    print(f"{'='*60}\n")
+
+
 def print_timetable_summary(expanded_courses, assignments, schedule):
     course_map = {c.course_id: c for c in expanded_courses}
     classroom_map = schedule.get_classroom_map()
@@ -157,6 +189,7 @@ def save_results_to_json(
     report_before,
     report_after,
     history,
+    pref_result,
     output_path
 ):
     result = {
@@ -168,9 +201,24 @@ def save_results_to_json(
             "ga_generations": len(history.generations),
             "ga_elapsed_seconds": round(history.elapsed_time, 3),
             "final_best_fitness": round(history.best_fitness[-1], 6),
+            "pref_total": pref_result.total_preferences,
+            "pref_satisfied": pref_result.satisfied_count,
+            "pref_satisfaction_rate": round(pref_result.satisfaction_rate, 4),
+            "hard_pref_satisfied": pref_result.hard_satisfied,
+            "hard_pref_total": pref_result.hard_preferences,
         },
         "conflicts_before": asdict(report_before),
         "conflicts_after": asdict(report_after),
+        "preferences": {
+            "total": pref_result.total_preferences,
+            "hard_total": pref_result.hard_preferences,
+            "soft_total": pref_result.soft_preferences,
+            "satisfied": pref_result.satisfied_count,
+            "hard_satisfied": pref_result.hard_satisfied,
+            "soft_satisfied": pref_result.soft_satisfied,
+            "satisfaction_rate": pref_result.satisfaction_rate,
+            "violated_details": pref_result.violated_details,
+        },
         "adjustments": [],
     }
 
@@ -204,11 +252,13 @@ def run_scheduler(
     diversity_preserve: bool = True,
     migration_rate: float = 0.05,
     large_scale_test: bool = False,
+    use_preferences: bool = True,
+    use_locks: bool = True,
 ):
     ensure_output_dir()
     print_banner()
 
-    print("  [步骤1/6] 加载排课数据...")
+    print("  [步骤1/7] 加载排课数据...")
     courses, classrooms, timeslots = create_sample_data()
     schedule = Schedule(
         courses=courses,
@@ -218,7 +268,14 @@ def run_scheduler(
     )
     print(f"    ✓ 课程数: {len(courses)} | 教室数: {len(classrooms)} | 时间段数: {len(timeslots)}")
 
-    print("\n  [步骤2/6] 展开为独立课时...")
+    preferences = create_sample_preferences() if use_preferences else []
+    locked_courses = create_sample_locks() if use_locks else []
+    if preferences:
+        print(f"    ✓ 偏好约束: {len(preferences)} 条 (硬约束{sum(1 for p in preferences if p.priority=='hard')}条)")
+    if locked_courses:
+        print(f"    ✓ 手动锁定: {len(locked_courses)} 门课程")
+
+    print("\n  [步骤2/7] 展开为独立课时...")
     expanded_courses = expand_courses_to_sessions(courses)
     print(f"    ✓ 展开后课程节数: {len(expanded_courses)}")
     for c in expanded_courses:
@@ -226,7 +283,7 @@ def run_scheduler(
         print(f"      - {c.name} ({c.teacher}, {c.student_count}人) "
               f"适用教室: {len(valid_rooms)}间")
 
-    print("\n  [步骤3/6] 生成初始排课方案...")
+    print("\n  [步骤3/7] 生成初始排课方案...")
     temp_schedule = Schedule(
         courses=expanded_courses,
         classrooms=classrooms,
@@ -249,7 +306,17 @@ def run_scheduler(
             ))
         print(f"    ✓ 已生成半随机初始方案 (种子: {random_seed})")
 
-    print("\n  [步骤4/6] 检测初始方案冲突...")
+    if locked_courses:
+        for lock in locked_courses:
+            if lock.course_id < len(initial_assignments):
+                a = initial_assignments[lock.course_id]
+                if lock.lock_timeslot:
+                    a.timeslot_id = lock.timeslot_id
+                if lock.lock_classroom:
+                    a.classroom_id = lock.classroom_id
+        print(f"    ✓ 已应用 {len(locked_courses)} 个手动锁定")
+
+    print("\n  [步骤4/7] 检测初始方案冲突...")
     detector = ConflictDetector(temp_schedule)
     report_before = detector.detect(initial_assignments)
     conflicting_before = detector.get_conflicting_courses(report_before)
@@ -267,13 +334,15 @@ def run_scheduler(
         save_path=os.path.join(OUTPUT_DIR, "02_conflicts_initial.png")
     )
 
-    print("\n  [步骤5/6] 遗传算法优化排课...")
+    print("\n  [步骤5/7] 遗传算法优化排课...")
     ga_kwargs = dict(
         population_size=population_size,
         max_generations=max_generations,
         mutation_rate=mutation_rate,
         elite_count=elite_count,
         random_seed=random_seed,
+        preferences=preferences,
+        locked_courses=locked_courses,
     )
     if use_improved_ga:
         ga_kwargs.update(dict(
@@ -301,7 +370,7 @@ def run_scheduler(
         **ga_kwargs
     )
 
-    optimized_assignments, report_after, history = ga.optimize(
+    optimized_assignments, report_after, history, pref_result = ga.optimize(
         initial_assignments=initial_assignments,
         target_conflicts=0,
         patience=120,
@@ -310,15 +379,19 @@ def run_scheduler(
     conflicting_after = detector.get_conflicting_courses(report_after)
 
     print_conflict_report(report_after, "优化后方案冲突检测报告")
+    print_preference_result(pref_result)
 
     print(f"\n  算法统计: 总代数={len(history.generations)}, "
           f"耗时={history.elapsed_time:.3f}秒, "
           f"重启次数={getattr(history, 'restarts', 0)}, "
           f"最终多样性={history.diversity[-1] if history.diversity else 'N/A'}")
 
-    print("\n  [步骤6/6] 生成可视化结果与报告...")
+    print("\n  [步骤6/7] 生成可视化结果与报告...")
     adjustments = find_adjustments(initial_assignments, optimized_assignments)
     adjusted_ids = {cid for cid, _, _ in adjustments}
+
+    locked_ids = {l.course_id for l in locked_courses} if locked_courses else set()
+    adjusted_ids -= locked_ids
 
     print_adjustments(adjustments, expanded_courses, schedule)
 
@@ -326,7 +399,8 @@ def run_scheduler(
         schedule, expanded_courses, optimized_assignments,
         conflicting_courses=conflicting_after,
         adjusted_courses=adjusted_ids,
-        title="优化后课表 (★=已调整, ✖=仍有冲突)",
+        locked_courses=locked_ids,
+        title="优化后课表 (★=已调整, 🔒=已锁定, ✖=仍有冲突)",
         save_path=os.path.join(OUTPUT_DIR, "03_timetable_optimized.png")
     )
     visualize_convergence(
@@ -350,7 +424,7 @@ def run_scheduler(
 
     save_results_to_json(
         expanded_courses, initial_assignments, optimized_assignments,
-        adjustments, report_before, report_after, history,
+        adjustments, report_before, report_after, history, pref_result,
         os.path.join(OUTPUT_DIR, "scheduling_result.json")
     )
 
@@ -365,7 +439,7 @@ def run_scheduler(
         print(f"    {fname:<40s} {size_kb:7.1f} KB")
     print("="*60)
 
-    return optimized_assignments, report_after, adjustments, history
+    return optimized_assignments, report_after, adjustments, history, pref_result
 
 
 def main():
@@ -396,6 +470,10 @@ def main():
                         help="禁用多样性保持与部分重启")
     parser.add_argument("--migration-rate", type=float, default=0.05,
                         help="随机移民比例 (默认: 0.05)")
+    parser.add_argument("--no-preferences", action="store_true",
+                        help="禁用偏好约束")
+    parser.add_argument("--no-locks", action="store_true",
+                        help="禁用手动锁定")
 
     args = parser.parse_args()
 
@@ -415,6 +493,8 @@ def main():
             adaptive_mutation=not args.no_adaptive_mutation,
             diversity_preserve=not args.no_diversity,
             migration_rate=args.migration_rate,
+            use_preferences=not args.no_preferences,
+            use_locks=not args.no_locks,
         )
     except KeyboardInterrupt:
         print("\n\n用户中断执行。")

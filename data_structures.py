@@ -133,3 +133,105 @@ def expand_courses_to_sessions(courses: List[Course]) -> List[Course]:
             new_course.base_course_id = course.course_id
             expanded.append(new_course)
     return expanded
+
+
+@dataclass
+class Preference:
+    pref_id: int
+    pref_type: str
+    target: str
+    target_name: str
+    allowed_days: List[int] = field(default_factory=list)
+    allowed_periods: List[int] = field(default_factory=list)
+    allowed_classroom_ids: List[int] = field(default_factory=list)
+    priority: str = "hard"
+    weight: float = 5.0
+    description: str = ""
+
+    def is_satisfied(self, day: int, period: int, classroom_id: int) -> bool:
+        if self.allowed_days and day not in self.allowed_days:
+            return False
+        if self.allowed_periods and period not in self.allowed_periods:
+            return False
+        if self.allowed_classroom_ids and classroom_id not in self.allowed_classroom_ids:
+            return False
+        return True
+
+
+@dataclass
+class LockedCourse:
+    course_id: int
+    timeslot_id: int
+    classroom_id: int
+    lock_timeslot: bool = True
+    lock_classroom: bool = True
+    reason: str = ""
+
+
+def create_sample_preferences() -> List[Preference]:
+    prefs = []
+    prefs.append(Preference(
+        pref_id=0,
+        pref_type="teacher_time",
+        target="张教授",
+        target_name="张教授",
+        allowed_days=[1],
+        allowed_periods=[0, 1],
+        priority="hard",
+        weight=8.0,
+        description="张教授只愿意在周二上午上课"
+    ))
+    prefs.append(Preference(
+        pref_id=1,
+        pref_type="course_time",
+        target="高等数学",
+        target_name="高等数学",
+        allowed_periods=[0, 1],
+        priority="hard",
+        weight=6.0,
+        description="高等数学必须安排在上午"
+    ))
+    prefs.append(Preference(
+        pref_id=2,
+        pref_type="course_room",
+        target="人工智能",
+        target_name="人工智能",
+        allowed_classroom_ids=[6, 7],
+        priority="soft",
+        weight=3.0,
+        description="人工智能优先安排在多媒体教室"
+    ))
+    prefs.append(Preference(
+        pref_id=3,
+        pref_type="course_time",
+        target="数据结构",
+        target_name="数据结构",
+        allowed_periods=[0, 1, 2],
+        priority="soft",
+        weight=2.0,
+        description="数据结构尽量安排在白天（前6节）"
+    ))
+    prefs.append(Preference(
+        pref_id=4,
+        pref_type="teacher_time",
+        target="李教授",
+        target_name="李教授",
+        allowed_days=[0, 2, 4],
+        priority="soft",
+        weight=2.5,
+        description="李教授偏好周一、周三、周五上课"
+    ))
+    return prefs
+
+
+def create_sample_locks() -> List[LockedCourse]:
+    locks = []
+    locks.append(LockedCourse(
+        course_id=8,
+        timeslot_id=12,
+        classroom_id=4,
+        lock_timeslot=True,
+        lock_classroom=True,
+        reason="计算机网络实验课，实验设备已预约"
+    ))
+    return locks
